@@ -1,7 +1,7 @@
 {
   "name": "Marquee — Your Theater",
   "short_name": "Marquee",
-  "description": "A custom video player with playlists, subtitles, and gestures.",
+  "description": "A cinema-styled video player with ambient glow, filters, zoom, resume, and gesture controls.",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "any",
