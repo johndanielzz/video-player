@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.15/hls.min.js" defer></script>
 <style>
   :root{
     --bg:#0B0B0F;
@@ -124,7 +125,8 @@
     transition:opacity .6s ease;pointer-events:none;transform:scale(1.08);}
   #ambilight.on{opacity:.65;}
   #videoStage{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;overflow:hidden;}
-  #video{width:100%;height:100%;object-fit:contain;background:transparent;transform-origin:center center;transition:transform .05s linear;}
+  #video{width:100%;height:100%;object-fit:contain;background:transparent;transform-origin:center center;}
+  #video.snapzoom{transition:transform .12s ease;}
   #video::cue{color:var(--sub-color);font-size:calc(1em * var(--sub-size));background:rgba(0,0,0,var(--sub-bg));}
 
   #tapzones{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr 1fr;z-index:3;}
@@ -237,6 +239,35 @@
   .swatches{display:flex;gap:8px;}
   .swatch{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;flex:none;}
   .swatch.sel{border-color:var(--text);}
+
+  /* watch-online modal */
+  #streamModalBackdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:24;display:none;}
+  #streamModal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.96);opacity:0;
+    width:min(560px,90vw);max-height:82vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);z-index:25;padding:22px;display:none;transition:transform .18s ease, opacity .18s ease;}
+  #streamModal.open{display:block;}
+  #streamModal.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  #streamModalBackdrop.show{display:block;}
+  .streamHelp{font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 14px;}
+  .streamLimits{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
+  #streamInputRow{display:flex;gap:8px;}
+  #streamInputRow input{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;
+    padding:11px 14px;color:var(--text);font-size:14px;}
+  #streamInputRow input:focus{outline:none;border-color:var(--gold-dim);}
+  #streamNote{margin-top:14px;padding:14px;border-radius:10px;background:rgba(232,179,76,0.08);
+    border:1px solid rgba(232,179,76,0.25);font-size:13px;line-height:1.5;}
+  #streamNote a, #streamNote .btn{margin-top:10px;}
+
+  /* youtube embed view (official iframe, no custom overlay controls) */
+  #ytStage{position:absolute;inset:0;z-index:6;display:none;background:#000;}
+  #ytStage iframe{width:100%;height:100%;border:0;}
+  #ytBackBtn{position:absolute;top:14px;left:14px;z-index:7;}
+
+  /* buffering spinner */
+  #bufferSpin{position:absolute;top:50%;left:50%;width:44px;height:44px;margin:-22px 0 0 -22px;z-index:4;
+    border-radius:50%;border:3px solid rgba(255,255,255,0.18);border-top-color:var(--gold);
+    display:none;animation:spin .8s linear infinite;pointer-events:none;}
+  @keyframes spin{to{transform:rotate(360deg);}}
   .switch{position:relative;width:42px;height:24px;flex:none;}
   .switch input{opacity:0;width:0;height:0;}
   .slidepill{position:absolute;inset:0;background:rgba(255,255,255,0.15);border-radius:999px;cursor:pointer;transition:background .2s;}
@@ -317,12 +348,37 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>
           Open URL
         </button>
+        <button class="btn" id="openStreamBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l5-3v10l-5-3M4 6h9a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"/></svg>
+          Watch Online
+        </button>
       </div>
       <div id="urlbar">
         <input id="urlInput" type="text" placeholder="https://example.com/movie.mp4">
         <button class="btn primary" id="urlGoBtn">Play</button>
       </div>
       <input type="file" id="fileInput" accept="video/*" multiple style="display:none">
+    </div>
+
+    <div id="streamModalBackdrop"></div>
+    <div id="streamModal">
+      <div class="settitle">Watch Online <button class="iconbtn sm" id="closeStreamBtn">✕</button></div>
+      <p class="streamHelp">Paste a link and Marquee will play it if it can. Direct video files (.mp4/.webm) and
+        HLS streams (.m3u8) play right here with full Marquee controls. YouTube links open in YouTube's own
+        embedded player (its official, licensed way to play a video on another site).</p>
+      <div id="streamInputRow">
+        <input id="streamInput" type="text" placeholder="Paste a video link…">
+        <button class="btn primary" id="streamGoBtn">Watch</button>
+      </div>
+      <div id="streamNote" style="display:none;"></div>
+      <p class="streamHelp streamLimits">
+        <strong>What won't work here, and why:</strong> Netflix, Disney+, Prime Video, HBO Max/Max, Hulu and
+        similar services encrypt their video (DRM) so no third-party page — this one included — can decode or
+        replay it; you can only watch those through the real app or site. TikTok and Instagram don't offer an
+        embeddable player for arbitrary posts, only their own app/site. "MovieBox" and similar link-aggregator
+        or download sites typically re-host copyrighted films without a license, so Marquee won't fetch or
+        play from them. For any of these, use the "Open Link" button to jump straight to the source instead.
+      </p>
     </div>
 
     <div id="playlist" style="display:none;">
@@ -345,7 +401,14 @@
   <!-- ================= PLAYER VIEW ================= -->
   <div id="playerView">
     <canvas id="ambilight"></canvas>
-    <div id="videoStage"><video id="video" playsinline></video></div>
+    <div id="videoStage"><video id="video" playsinline webkit-playsinline preload="metadata"></video></div>
+    <div id="bufferSpin"></div>
+
+    <div id="ytStage">
+      <button class="iconbtn" id="ytBackBtn" title="Back to library">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+      </button>
+    </div>
 
     <div id="tapzones">
       <div class="tapzone" id="zoneL"></div>
@@ -746,6 +809,109 @@
   $('urlGoBtn').addEventListener('click', ()=>addUrl($('urlInput').value.trim()));
   $('urlInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addUrl(e.target.value.trim()); });
 
+  /* ---------- Watch Online: paste-a-link routing ----------
+     Only handles what a browser page can actually, legitimately do:
+     - direct video files / HLS streams -> play in Marquee itself
+     - YouTube links -> YouTube's own official embeddable player
+     - DRM-protected services (Netflix, Disney+, Prime Video, Hulu, Max…), TikTok/Instagram
+       (no embeddable player for arbitrary posts), and re-hosting/aggregator sites -> can't be
+       played here; offer to open the real link instead. No page can legally or technically
+       decode another service's encrypted video or scrape it out from under its app. */
+  function classifyLink(raw){
+    let url;
+    try{ url = new URL(raw); }catch(e){ return {type:'invalid'}; }
+    const host = url.hostname.replace(/^www\./i,'').toLowerCase();
+    const yt = ['youtube.com','m.youtube.com','youtube-nocookie.com','youtu.be'];
+    if(yt.some(h=>host===h || host.endsWith('.'+h))){
+      let id = null;
+      if(host==='youtu.be') id = url.pathname.slice(1).split('/')[0];
+      else if(url.pathname==='/watch') id = url.searchParams.get('v');
+      else { const m = url.pathname.match(/\/(embed|shorts|live)\/([^/?]+)/); if(m) id = m[2]; }
+      return id ? {type:'youtube', id} : {type:'invalid'};
+    }
+    const blocked = {
+      'netflix.com':'Netflix', 'disneyplus.com':'Disney+', 'primevideo.com':'Prime Video',
+      'hulu.com':'Hulu', 'max.com':'Max', 'hbomax.com':'Max', 'peacocktv.com':'Peacock',
+      'appletv.com':'Apple TV', 'tv.apple.com':'Apple TV',
+      'tiktok.com':'TikTok', 'instagram.com':'Instagram',
+      'moviebox.ng':'MovieBox', 'moviebox.pro':'MovieBox', 'moviebox.ph':'MovieBox'
+    };
+    for(const h in blocked){ if(host===h || host.endsWith('.'+h)) return {type:'unsupported', label:blocked[h]}; }
+    return {type:'direct'};
+  }
+
+  const streamModal = $('streamModal'), streamBackdrop = $('streamModalBackdrop'), streamInput = $('streamInput');
+  function openStreamModal(){
+    streamModal.classList.add('open'); streamBackdrop.classList.add('show');
+    requestAnimationFrame(()=>streamModal.classList.add('show'));
+    $('streamNote').style.display = 'none';
+    streamInput.value = '';
+    setTimeout(()=>streamInput.focus(), 50);
+  }
+  function closeStreamModal(){
+    streamModal.classList.remove('show'); streamBackdrop.classList.remove('show');
+    setTimeout(()=>streamModal.classList.remove('open'), 180);
+  }
+  function showStreamNote(msg, openUrl){
+    const note = $('streamNote');
+    note.innerHTML = msg + (openUrl ? '<div><button class="btn sm" id="streamOpenExternal">Open Link ↗</button></div>' : '');
+    note.style.display = 'block';
+    if(openUrl) $('streamOpenExternal').addEventListener('click', ()=>window.open(openUrl,'_blank','noopener'));
+  }
+  function handleStreamGo(){
+    const raw = streamInput.value.trim();
+    if(!raw) return;
+    const info = classifyLink(raw);
+    if(info.type==='invalid'){ showStreamNote("That doesn't look like a playable video link."); return; }
+    if(info.type==='unsupported'){
+      showStreamNote(`${info.label} encrypts (or, for aggregator/download sites, may not hold the rights to) its video, so no page outside its own app can play it — Marquee included.`, raw);
+      return;
+    }
+    if(info.type==='youtube'){ closeStreamModal(); playYouTube(info.id); return; }
+    closeStreamModal();
+    addUrl(raw);
+  }
+  $('openStreamBtn').addEventListener('click', openStreamModal);
+  $('closeStreamBtn').addEventListener('click', closeStreamModal);
+  streamBackdrop.addEventListener('click', closeStreamModal);
+  $('streamGoBtn').addEventListener('click', handleStreamGo);
+  streamInput.addEventListener('keydown', e=>{ if(e.key==='Enter') handleStreamGo(); });
+
+  // YouTube plays through its own official embed — a licensed way to show a YouTube video on
+  // another page. It comes with YouTube's own controls/branding; Marquee's custom seek bar,
+  // filters, and ambient glow can't reach inside it (no site can reach into another site's iframe).
+  const ytStage = $('ytStage'), ytBackBtn = $('ytBackBtn');
+  let ytFrame = null;
+  function playYouTube(id){
+    video.pause();
+    destroyHls();
+    library.style.display = 'none';
+    playerView.style.display = 'block';
+    $('videoStage').style.display = 'none';
+    $('tapzones').style.display = 'none';
+    $('controls').style.display = 'none';
+    $('topbar').style.display = 'none';
+    $('bufferSpin').style.display = 'none';
+    if(ytFrame) ytFrame.remove();
+    ytFrame = document.createElement('iframe');
+    ytFrame.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`;
+    ytFrame.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+    ytFrame.allowFullscreen = true;
+    ytStage.appendChild(ytFrame);
+    ytStage.style.display = 'block';
+  }
+  function closeYouTube(){
+    ytStage.style.display = 'none';
+    if(ytFrame){ ytFrame.remove(); ytFrame = null; }
+    $('videoStage').style.display = 'flex';
+    $('tapzones').style.display = 'grid';
+    $('controls').style.display = '';
+    $('topbar').style.display = '';
+    playerView.style.display = 'none';
+    library.style.display = 'flex';
+  }
+  ytBackBtn.addEventListener('click', closeYouTube);
+
   ['dragenter','dragover'].forEach(ev=>dropzone.addEventListener(ev, e=>{
     e.preventDefault(); dropzone.classList.add('drag');
   }));
@@ -764,6 +930,16 @@
   function applyVideoTransform(){
     video.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
   }
+  // used for discrete steps (keyboard +/-, buttons) where a short animated snap looks nice;
+  // continuous gestures (wheel/pinch/drag) call applyVideoTransform() directly with no transition
+  // so they track the pointer/finger with zero lag instead of fighting a queued CSS transition.
+  let snapTimer;
+  function snapVideoTransform(){
+    video.classList.add('snapzoom');
+    applyVideoTransform();
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(()=>video.classList.remove('snapzoom'), 140);
+  }
   function resetZoom(){ zoomScale=1; panX=0; panY=0; applyVideoTransform(); }
 
   function curtainOpen(){
@@ -777,11 +953,38 @@
     });
   }
 
+  // handles both plain files/blob URLs and .m3u8 (HLS) network streams. HLS.js gives adaptive
+  // bitrate + built-in stall/error recovery, which is what most "video keeps hanging" reports
+  // on network sources turn out to be missing.
+  let hls = null;
+  function destroyHls(){ if(hls){ try{ hls.destroy(); }catch(e){} hls = null; } }
+  function loadSource(url){
+    destroyHls();
+    const isBlob = url.startsWith('blob:');
+    if(isBlob) video.removeAttribute('crossorigin');
+    else video.crossOrigin = 'anonymous'; // lets ambient-glow/thumbnail canvas read the frame when the host allows CORS; harmless if it doesn't
+    const isHls = /\.m3u8(\?|#|$)/i.test(url);
+    if(isHls && window.Hls && Hls.isSupported()){
+      hls = new Hls({ maxBufferLength: 30, backBufferLength: 60, enableWorker: true });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, (evt, data)=>{
+        if(!data || !data.fatal) return;
+        if(data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+        else if(data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        else { destroyHls(); video.src = url; }
+      });
+    } else {
+      video.src = url; // native <video> handles mp4/webm directly, and Safari decodes .m3u8 natively too
+    }
+  }
+
   function playIndex(i){
     if(i<0 || i>=items.length) return;
     currentIndex = i;
     const it = items[i];
-    video.src = it.url;
+    if(scrubVideo){ scrubVideo.src=''; scrubVideo=null; }
+    loadSource(it.url);
     $('nowTitle').textContent = it.name;
     library.style.display = 'none';
     playerView.style.display = 'block';
@@ -810,6 +1013,7 @@
 
   $('backBtn').addEventListener('click', ()=>{
     video.pause();
+    destroyHls();
     playerView.style.display = 'none';
     library.style.display = 'flex';
     renderPlaylist();
@@ -818,7 +1022,27 @@
 
   video.addEventListener('error', ()=>{
     $('errBox').style.display = 'flex';
+    $('bufferSpin').style.display = 'none';
   });
+
+  // buffering feedback + stall recovery: without this, normal network buffering
+  // (slow connection, adaptive bitrate switch, seeking ahead of what's downloaded)
+  // looks indistinguishable from the player being frozen.
+  let stallTimer;
+  video.addEventListener('waiting', ()=>{
+    $('bufferSpin').style.display = 'block';
+    clearTimeout(stallTimer);
+    stallTimer = setTimeout(()=>{
+      if(video.paused || video.ended || video.readyState>=3) return;
+      // small nudge forward — a known trick to unstick a decoder that's stuck waiting
+      // on a frame that will never arrive (common on some flaky HLS/network streams)
+      try{ video.currentTime = video.currentTime + 0.01; }catch(e){}
+    }, 6000);
+  });
+  ['playing','canplay','pause','ended','emptied'].forEach(ev=>video.addEventListener(ev, ()=>{
+    clearTimeout(stallTimer);
+    $('bufferSpin').style.display = 'none';
+  }));
 
   // play/pause
   const playIcon = $('playIcon');
@@ -902,8 +1126,13 @@
 
   function ensureScrubVideo(){
     if(scrubVideo || !items[currentIndex]) return;
+    const srcUrl = items[currentIndex].url;
+    // local files only: a remote/HLS source would need a second full network fetch (or a second
+    // HLS.js instance) just to preview a thumbnail, competing with the main video for bandwidth —
+    // that trade-off isn't worth it, so streamed sources just skip the hover preview.
+    if(!srcUrl.startsWith('blob:')) return;
     scrubVideo = document.createElement('video');
-    scrubVideo.src = items[currentIndex].url;
+    scrubVideo.src = srcUrl;
     scrubVideo.muted = true; scrubVideo.preload = 'auto';
     scrubVideo.addEventListener('seeked', ()=>{
       try{ scrubCtx.drawImage(scrubVideo, 0,0,140,79); }catch(e){}
@@ -1160,19 +1389,22 @@
   const ambCanvas = $('ambilight');
   const ambCtx = ambCanvas.getContext('2d', {alpha:false});
   ambCanvas.width = 64; ambCanvas.height = 36;
-  let ambRunning = false;
-  function ambLoop(){
+  let ambRunning = false, ambLast = 0;
+  function ambLoop(ts){
     if(!ambRunning) return;
-    if(!video.paused && !video.ended && video.readyState>=2){
-      try{ ambCtx.drawImage(video, 0,0,64,36); }catch(e){}
+    if(settings.ambilight && !document.hidden && !video.paused && !video.ended && video.readyState>=2){
+      // ~15fps is plenty for a blurred backlight and far cheaper than sampling every display frame,
+      // which was competing with video decode for main-thread time and contributing to stutter
+      if(!ambLast || ts-ambLast>=66){ ambLast = ts; try{ ambCtx.drawImage(video, 0,0,64,36); }catch(e){} }
     }
     requestAnimationFrame(ambLoop);
   }
   video.addEventListener('play', ()=>{
     ambCanvas.classList.toggle('on', settings.ambilight);
-    if(!ambRunning){ ambRunning = true; ambLoop(); }
+    if(!ambRunning){ ambRunning = true; ambLoop(0); }
   });
   video.addEventListener('pause', ()=>{ /* keep last frame visible, dim slightly via CSS only */ });
+  document.addEventListener('visibilitychange', ()=>{ ambLast = 0; });
 
   /* ============ combined video filter (enhance preset + gesture brightness) ============ */
   let gestureBrightness = 1;
@@ -1309,8 +1541,8 @@ Zoom        ${zoomScale.toFixed(2)}×`;
       case 'f': $('fsBtn').click(); break;
       case '>': video.playbackRate = Math.min(3, video.playbackRate+0.25); toast(video.playbackRate+'×'); break;
       case '<': video.playbackRate = Math.max(0.25, video.playbackRate-0.25); toast(video.playbackRate+'×'); break;
-      case '+': case '=': zoomScale = Math.min(3, zoomScale+0.1); applyVideoTransform(); break;
-      case '-': zoomScale = Math.max(1, zoomScale-0.1); if(zoomScale===1){panX=0;panY=0;} applyVideoTransform(); break;
+      case '+': case '=': zoomScale = Math.min(3, zoomScale+0.1); snapVideoTransform(); break;
+      case '-': zoomScale = Math.max(1, zoomScale-0.1); if(zoomScale===1){panX=0;panY=0;} snapVideoTransform(); break;
       case 'a': $('setAbtn').click(); break;
       case 'b': $('setBbtn').click(); break;
       case 'i': $('statsToggle').checked = !$('statsToggle').checked; $('statsToggle').dispatchEvent(new Event('change')); break;

@@ -27,6 +27,38 @@ when opened as a local file. So to get the home-screen icon / app-window experie
    even with a flaky connection (the videos themselves still need to be local files or a reachable
    URL — the app doesn't store movies for you).
 
+## Watch Online (paste a link)
+There's now a **Watch Online** button next to Open Files/Open URL. Paste a link and Marquee
+routes it to whatever will actually work:
+
+- **Direct video files / HLS streams** (`.mp4`, `.webm`, `.m3u8`) play right inside Marquee, with
+  full custom controls, and now use **HLS.js** for adaptive streams so network video buffers more
+  smoothly and recovers from transient stalls instead of just freezing.
+- **YouTube links** open in YouTube's own official embedded player — that's the licensed way to
+  show a YouTube video on another page. It uses YouTube's own controls/branding; Marquee's zoom,
+  filters, and ambient glow can't reach inside another site's embedded player (no site can).
+- **Netflix, Disney+, Prime Video, Hulu, Max, Peacock, Apple TV** and similar services encrypt
+  their video (DRM), so no page outside their own app — this one included — can decode or replay
+  it. **TikTok and Instagram** don't offer an embeddable player for arbitrary posts. Sites like
+  "MovieBox" that re-host or link to movies typically don't hold the rights to that content, so
+  Marquee won't fetch from them either. For all of these, use the **Open Link** button Marquee
+  shows you, which just opens the real link in the real app/site instead.
+
+## Playback smoothness fixes
+If video was stuttering or seeming to hang, this version addresses several real causes:
+- The ambient-glow canvas was re-sampling the video every single display frame (up to 60×/sec)
+  regardless of whether the glow was even turned on — it's now throttled to ~15fps, skipped
+  entirely when off-screen or paused, and pauses when the tab is backgrounded.
+- Zoom/pan had a CSS transition applied to *every* transform update, so continuous gestures
+  (scroll-wheel zoom, pinch, drag-to-pan) were fighting a queued animation on every event. Now only
+  discrete zoom steps (keyboard `+`/`-`) animate; live gestures track instantly.
+- The seek-bar hover thumbnail was silently opening a **second full copy** of the video just to
+  grab preview frames — fine for local files, but for a network/streamed video it doubled the
+  bandwidth competing with actual playback. It's now local-file-only.
+- Network/HLS sources now go through HLS.js with real error recovery, and a buffering spinner
+  (plus an automatic stall-recovery nudge) makes normal rebuffering visible instead of looking
+  identical to a frozen player.
+
 ## What's new in this version
 
 - **Ambient glow** — a soft, blurred halo behind the picture that shifts color with whatever's on
