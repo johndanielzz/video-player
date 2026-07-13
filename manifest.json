@@ -1,12 +1,12 @@
 {
-  "name": "Marquee — Your Theater",
-  "short_name": "Marquee",
-  "description": "A cinema-styled video player with ambient glow, filters, zoom, resume, and gesture controls.",
+  "name": "REWIND — press play",
+  "short_name": "REWIND",
+  "description": "A tape-deck styled video player with tracking-bar scrub, CRT scanline glow, filters, zoom, resume, and gesture controls.",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0B0B0F",
-  "theme_color": "#0B0B0F",
+  "background_color": "#10131A",
+  "theme_color": "#10131A",
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]

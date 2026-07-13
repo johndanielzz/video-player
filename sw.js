@@ -1,4 +1,4 @@
-const CACHE = 'marquee-v3';
+const CACHE = 'rewind-v1';
 const ASSETS = ['./index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
